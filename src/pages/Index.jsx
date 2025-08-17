@@ -10,6 +10,7 @@ import AIButton from '@/components/AIButton';
 import AIDialog from '@/components/AIDialog';
 import DailyReview from '@/components/DailyReview';
 import { useSettings } from '@/context/SettingsContext';
+import { addDeletedMemoTombstone } from '@/lib/utils';
 import { toast } from 'sonner';
 
  const Index = () => {
@@ -294,6 +295,8 @@ import { toast } from 'sonner';
       const prev = raw ? JSON.parse(raw) : {};
       const next = { ...prev, memoPositions: positions };
       localStorage.setItem('canvasState', JSON.stringify(next));
+  // 通知全局数据变更（仅位置变化也会触发同步）
+  try { window.dispatchEvent(new CustomEvent('app:dataChanged', { detail: { part: 'canvas.memoPositions' } })); } catch {}
     } catch {}
   }, [memos, pinnedMemos]);
 
@@ -301,6 +304,8 @@ import { toast } from 'sonner';
   useEffect(() => {
     localStorage.setItem('memos', JSON.stringify(memos));
     localStorage.setItem('pinnedMemos', JSON.stringify(pinnedMemos));
+  // 通知全局数据变更
+  try { window.dispatchEvent(new CustomEvent('app:dataChanged', { detail: { part: 'memos' } })); } catch {}
   }, [memos, pinnedMemos]);
 
   // 保存侧栏固定状态到localStorage - 画布模式下不保存
@@ -319,7 +324,15 @@ import { toast } from 'sonner';
   // 保存画布模式状态到localStorage
   useEffect(() => {
     localStorage.setItem('isCanvasMode', JSON.stringify(isCanvasMode));
+    try { window.dispatchEvent(new CustomEvent('app:dataChanged', { detail: { part: 'canvas.mode' } })); } catch {}
   }, [isCanvasMode]);
+
+  // 首次加载完成后强制发一个变更事件，便于自动同步在启动时感知
+  useEffect(() => {
+    if (!isInitialLoad) {
+      try { window.dispatchEvent(new CustomEvent('app:dataChanged', { detail: { part: 'startup' } })); } catch {}
+    }
+  }, [isInitialLoad]);
 
   // 添加新memo
   const addMemo = () => {
@@ -469,8 +482,10 @@ import { toast } from 'sonner';
         }
         break;
       case 'delete':
-        setMemos(memos.filter(memo => memo.id !== memoId));
-        setPinnedMemos(pinnedMemos.filter(memo => memo.id !== memoId));
+  setMemos(memos.filter(memo => memo.id !== memoId));
+  setPinnedMemos(pinnedMemos.filter(memo => memo.id !== memoId));
+  // 记录删除墓碑用于云端删除
+  addDeletedMemoTombstone(memoId);
         break;
       default:
         break;
@@ -945,6 +960,7 @@ import { toast } from 'sonner';
   const handleCanvasDeleteMemo = (id) => {
     setMemos(memos.filter(memo => memo.id !== id));
     setPinnedMemos(pinnedMemos.filter(memo => memo.id !== id));
+  addDeletedMemoTombstone(id);
   };
 
   const handleCanvasTogglePin = (id) => {
