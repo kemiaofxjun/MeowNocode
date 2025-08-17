@@ -27,7 +27,7 @@ const Header = ({
 
         {/* Logo */}
         <img
-          src="https://s3.bmp.ovh/imgs/2025/07/31/baf5bf7ff49cae82.jpg"
+          src="https://img.314926.xyz/images/2025/08/17/jiaoxue1.webp"
           alt="应用Logo"
           className="h-10 w-10 rounded-full object-cover"
         />
@@ -35,7 +35,7 @@ const Header = ({
           className="ml-2 text-xl font-bold transition-colors duration-300"
           style={{ color: themeColor }}
         >
-          Meow
+          克喵的微语
         </span>
       </div>
       
