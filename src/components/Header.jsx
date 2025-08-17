@@ -27,7 +27,7 @@ const Header = ({
 
         {/* Logo */}
         <img
-          src="https://img.314926.xyz/images/2025/08/17/jiaoxue1.webp"
+          src="https://img.314926.xyz/images/2025/08/13/no-background-kemiaofxjun.webp"
           alt="应用Logo"
           className="h-10 w-10 rounded-full object-cover"
         />
