@@ -26,10 +26,15 @@ const MemoList = ({
   onCancelEdit,
   onTagClick,
   onScrollToTop,
-  clearFilters // 新增清除筛选函数
+  clearFilters, // 新增清除筛选函数
+  // backlinks
+  allMemos = [],
+  onAddBacklink,
+  onPreviewMemo,
+  onRemoveBacklink
 }) => {
   const { themeColor } = useTheme();
-  const allMemos = [...pinnedMemos, ...memos];
+  const memosForBacklinks = (allMemos && allMemos.length) ? allMemos : [...pinnedMemos, ...memos];
 
   // 处理菜单定位
   useEffect(() => {
@@ -234,7 +239,7 @@ const MemoList = ({
                       )}
                     </div>
                     
-                    {editingId === memo.id ? (
+        {editingId === memo.id ? (
                       <div className="mb-4">
                         <div className="relative">
                           <MemoEditor
@@ -244,16 +249,24 @@ const MemoList = ({
                             maxLength={5000}
                             showCharCount={true}
                             autoFocus={true}
+                            memosList={memosForBacklinks}
+          currentMemoId={memo.id}
+          backlinks={Array.isArray(memo.backlinks) ? memo.backlinks : []}
+          onAddBacklink={onAddBacklink}
+          onPreviewMemo={onPreviewMemo}
+                            onRemoveBacklink={onRemoveBacklink}
                           />
                           <div className="absolute bottom-12 right-2 flex items-center space-x-1 sm:space-x-2">
                             <Button
                               variant="outline"
+                              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                               onClick={onCancelEdit}
                               className="bg-white hover:bg-gray-50 text-gray-700 border-gray-300 px-2 py-1 sm:px-3 sm:py-2 text-sm"
                             >
                               取消
                             </Button>
                             <Button
+                              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
                               onClick={() => onSaveEdit(memo.id)}
                               disabled={!editContent.trim()}
                               className="bg-slate-600 hover:bg-slate-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white px-2 py-1 sm:px-3 sm:py-2 text-sm"
@@ -269,6 +282,41 @@ const MemoList = ({
                         activeTag={activeTag}
                         onTagClick={onTagClick}
                       />
+                    )}
+
+                    {/* 反链 chips（展示在每条 memo 下面） */}
+        {Array.isArray(memo.backlinks) && memo.backlinks.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {memo.backlinks.map((bid) => {
+          const m = memosForBacklinks.find(x => x.id === bid);
+                          if (!m) return null;
+                          return (
+                            <span key={`${memo.id}-bk-${bid}`} className="inline-flex items-center group">
+                              <button
+                                type="button"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPreviewMemo?.(bid); }}
+                                className="max-w-full inline-flex items-center gap-1 pl-2 pr-2 py-0.5 rounded-md bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+                              >
+                                <span className="truncate inline-block max-w-[200px]">{m.content?.replace(/\n/g, ' ').slice(0, 60) || '（无内容）'}</span>
+                                {/* 小箭头图标 */}
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="opacity-70">
+                                  <path d="M7 17L17 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                  <path d="M9 7H17V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                                </svg>
+                              </button>
+                              {/* hover 才出现的小 × */}
+                              <button
+                                type="button"
+                                className="ml-1 w-4 h-4 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveBacklink?.(memo.id, bid); }}
+                                aria-label="移除反链"
+                              >
+                                ×
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
                     )}
 
                     <div className="mt-3 flex justify-end">

@@ -1,5 +1,6 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/context/ThemeContext';
 import { useSettings } from '@/context/SettingsContext';
@@ -10,20 +11,35 @@ const MemoEditor = ({
   placeholder = '现在的想法是……',
   onSubmit,
   disabled = false,
-  maxLength = 5000,
-  showCharCount = true,
+  maxLength,
+  showCharCount = false,
   autoFocus = false,
   className = '',
+  // backlinks related
+  memosList = [],
+  currentMemoId = null,
+  backlinks = [],
+  onAddBacklink,
+  onRemoveBacklink,
+  onPreviewMemo,
+  // optional focus callbacks
   onFocus,
-  onBlur
+  onBlur,
 }) => {
+  // theme & settings
+  const { themeColor } = useTheme();
+  const { fontConfig, hitokotoConfig } = useSettings();
+  const currentFont = fontConfig?.selectedFont || 'default';
+
+  // local states / refs
+  const textareaRef = useRef(null);
   const [isFocused, setIsFocused] = useState(false);
   const [isComposing, setIsComposing] = useState(false);
   const [compositionValue, setCompositionValue] = useState('');
-  const [hitokoto, setHitokoto] = useState({ text: '加载中...', uuid: '' });
-  const textareaRef = useRef(null);
-  const { darkMode, themeColor, currentFont } = useTheme();
-  const { hitokotoConfig } = useSettings();
+  const [hitokoto, setHitokoto] = useState({ text: '' });
+  const [showBacklinkPicker, setShowBacklinkPicker] = useState(false);
+  const [pickerPos, setPickerPos] = useState(null);
+  const backlinkBtnRef = useRef(null);
 
   // 获取一言或内置句子
   const fetchHitokoto = async () => {
@@ -175,6 +191,44 @@ const MemoEditor = ({
     }, 0);
   };
 
+  // 选择一个目标 memo 建立双链
+  const handlePickBacklink = (targetId) => {
+    if (!onAddBacklink) return;
+    if (currentMemoId && targetId === currentMemoId) return;
+    onAddBacklink(currentMemoId || null, targetId);
+    setShowBacklinkPicker(false);
+  };
+
+  // 计算选择卡片的屏幕定位，避免被滚动容器裁剪
+  const updatePickerPosition = useCallback(() => {
+    const btn = backlinkBtnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const width = 320;
+    const margin = 8;
+    let left = Math.min(rect.left, window.innerWidth - width - margin);
+    if (left < margin) left = margin;
+    const top = Math.min(rect.bottom + 6, window.innerHeight - margin);
+    setPickerPos({ left, top, width });
+  }, []);
+
+  useEffect(() => {
+    if (!showBacklinkPicker) return;
+    updatePickerPosition();
+    const onResize = () => updatePickerPosition();
+    const onScroll = () => updatePickerPosition();
+    window.addEventListener('resize', onResize);
+    // 捕获阶段监听滚动，包含内部滚动容器
+    window.addEventListener('scroll', onScroll, true);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('scroll', onScroll, true);
+    };
+  }, [showBacklinkPicker, updatePickerPosition]);
+
+  const findMemoById = (id) => memosList.find(m => m.id === id);
+  const backlinkMemos = (backlinks || []).map(findMemoById).filter(Boolean);
+
   // 焦点事件
   const handleFocus = () => {
     setIsFocused(true);
@@ -262,6 +316,32 @@ const MemoEditor = ({
         rows={5}
       />
 
+      {/* 反链 Chips（编辑时显示） */}
+      {isFocused && backlinkMemos.length > 0 && (
+        <div className="px-3 pb-1 -mt-2 flex flex-wrap gap-2">
+          {backlinkMemos.map((m) => (
+            <span key={m.id} className="inline-flex items-center group">
+              <button
+                type="button"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onPreviewMemo?.(m.id); }}
+                className="max-w-full inline-flex items-center gap-1 pl-2 pr-2 py-0.5 rounded-md bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200 text-xs hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+              >
+                <span className="truncate inline-block max-w-[180px]">{m.content?.replace(/\n/g, ' ').slice(0, 50) || '（无内容）'}</span>
+                <ArrowUpRight className="h-3.5 w-3.5 opacity-70" />
+              </button>
+              <button
+                type="button"
+                aria-label="移除反链"
+                className="ml-1 w-4 h-4 rounded hover:bg-black/10 dark:hover:bg-white/10 text-gray-500 dark:text-gray-300 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveBacklink?.(currentMemoId || null, m.id); }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
       {/* 底部信息栏 */}
       {(showCharCount || onSubmit) && (
         <div className="flex items-center justify-between px-3 py-1 border-t border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/50 min-h-[32px]">
@@ -285,7 +365,7 @@ const MemoEditor = ({
           ) : isFocused ? (
             <>
               {/* 左侧：字数 + 插入spoiler按钮 */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative">
                 {showCharCount && (
                   <div className={cn(
                     "text-xs transition-colors",
@@ -314,6 +394,56 @@ const MemoEditor = ({
                     <rect x="2" y="2" width="14" height="8" rx="3" fill="currentColor" opacity="0.9" filter="url(#f)" />
                   </svg>
                 </button>
+
+                {/* 双链按钮 */}
+                <button
+                  type="button"
+                  ref={backlinkBtnRef}
+                  onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); setShowBacklinkPicker(v => !v); }}
+                  className={cn(
+                    "inline-flex items-center justify-center h-7 px-2 rounded-md text-gray-600 bg-white hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
+                  )}
+                >
+                  {/* 简洁链路图标 */}
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M10 14a5 5 0 0 1 0-7.07l1.94-1.94a5 5 0 0 1 7.07 7.07l-1.25 1.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <path d="M14 10a5 5 0 0 1 0 7.07l-1.94 1.94a5 5 0 0 1-7.07-7.07l1.25-1.25" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                  </svg>
+                </button>
+
+                {/* 双链选择卡片 */}
+                {isFocused && showBacklinkPicker && (
+                  <div
+                    className="fixed z-50 w-[320px] max-h-56 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden"
+                    style={{ left: pickerPos?.left ?? 16, top: pickerPos?.top ?? 100, width: pickerPos?.width ?? 320 }}
+                    onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                  >
+                    <div className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400 border-b border-gray-100 dark:border-gray-700">选择一个 Memo 建立双链</div>
+                    <div className="overflow-y-auto pr-2 scrollbar-transparent" style={{ maxHeight: '11rem' }}>
+                      {(memosList || [])
+                        .filter(m => m.id !== currentMemoId)
+                        .filter(m => !(Array.isArray(backlinks) && backlinks.includes(m.id)))
+                        .slice(0, 50)
+                        .map(m => (
+                        <button
+                          key={m.id}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                          onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); handlePickBacklink(m.id); }}
+                             
+                        >
+                          <div className="truncate">{m.content?.replace(/\n/g, ' ') || '（无内容）'}</div>
+                          <div className="text-[11px] text-gray-400 mt-0.5">{new Date(m.updatedAt || m.createdAt).toLocaleString('zh-CN', { month: 'short', day: 'numeric' })}</div>
+                        </button>
+                      ))}
+                      {(memosList || [])
+                        .filter(m => m.id !== currentMemoId)
+                        .filter(m => !(Array.isArray(backlinks) && backlinks.includes(m.id)))
+                        .length === 0 && (
+                        <div className="px-3 py-6 text-center text-xs text-gray-500 dark:text-gray-400">暂无可选 Memo</div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 右侧：快捷键提示 */}

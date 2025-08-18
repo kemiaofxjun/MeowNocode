@@ -47,7 +47,13 @@ const MainContent = ({
   onScrollToTop,
   clearFilters, // 新增清除筛选函数
   onEditorFocus,
-  onEditorBlur
+  onEditorBlur,
+  // backlinks
+  allMemos,
+  onAddBacklink,
+  onPreviewMemo,
+  pendingNewBacklinks
+  , onRemoveBacklink
 }) => {
   const { themeColor } = useTheme();
 
@@ -76,6 +82,12 @@ const MainContent = ({
         onAddMemo={onAddMemo}
         onEditorFocus={onEditorFocus}
         onEditorBlur={onEditorBlur}
+  // backlinks for input editor (new memo has no id; only provide memos list)
+  allMemos={allMemos}
+  onAddBacklink={onAddBacklink}
+  onPreviewMemo={onPreviewMemo}
+  pendingNewBacklinks={pendingNewBacklinks}
+  onRemoveBacklink={onRemoveBacklink}
       />
 
       {/* Memos列表 */}
@@ -100,6 +112,11 @@ const MainContent = ({
         onTagClick={onTagClick}
         onScrollToTop={onScrollToTop}
         clearFilters={clearFilters} // 传递清除筛选函数
+  // backlinks for memo cards
+  allMemos={allMemos}
+  onAddBacklink={onAddBacklink}
+  onPreviewMemo={onPreviewMemo}
+  onRemoveBacklink={onRemoveBacklink}
       />
     </div>
   );
